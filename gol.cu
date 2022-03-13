@@ -14,11 +14,11 @@
 
 const unsigned int THREAD_1D = 16;
 //const unsigned int BLOCK_AREA = THREAD_1D * THREAD_1D;
-const unsigned int BLOCK_1D = 800;
+const unsigned int BLOCK_1D = 80;
 const unsigned int DIM = (THREAD_1D * BLOCK_1D);
 // Reserving 4 rows/cols of 0s on the border to eliminate edge cases
 
-const unsigned int GEN_COUNT = 200;
+const unsigned int GEN_COUNT = 2000;
 const std::string DEFAULT_PATTERN_FILE = "data.txt";
 
 
