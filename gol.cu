@@ -1,19 +1,23 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-
 #include <chrono>
-#include <ctime>
 #include <functional>
 #include <string>
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <GL/glut.h>
-#include <conio.h>
 #include <thread>
 
+/**
+ * @author Luan (Remi) Ta
+ * @version 1.0 (03/13/22)
+ *
+ * Conway's Game of Life simulated with OpenGL (FreeGlut/NVIDIA's CG)
+ * The simulation attempts to compare the performance of a naive CUDA solution vs that of a serial one
+ */
+
 const unsigned int THREAD_1D = 16;
-//const unsigned int BLOCK_AREA = THREAD_1D * THREAD_1D;
 const unsigned int BLOCK_1D = 80;
 const unsigned int DIM = (THREAD_1D * BLOCK_1D);
 // Reserving 4 rows/cols of 0s on the border to eliminate edge cases
@@ -22,14 +26,26 @@ const unsigned int GEN_COUNT = 2000;
 const std::string DEFAULT_PATTERN_FILE = "data.txt";
 
 
-// Each generation takes up a space of DIM * DIM
-// Each row takes up a space of DIM -> offset by col
+/**
+ * @param gen The generation offset (by DIMxDIM per generation)
+ * @param row The row offset (By DIM per row)
+ * @param col The column offset (By 1 per col)
+ * @return the actual index of the linearized 3-D grid of (generation, row, col)
+ */
 __forceinline __device__ static unsigned int getActualIdx(unsigned int gen, unsigned int row, unsigned int col)
 {
+    // Each generation takes up a space of DIM * DIM
+    // Each row takes up a space of DIM -> offset by col
     unsigned int genStart = gen * DIM * DIM; // Each subarray has DIM * DIM length
     return genStart + row * DIM + col;
 }
 
+/**
+ * [Compute kernel]
+ * Determines whether the cell owned by this thread should be alive/dead for this generation
+ * @param gens linearized 3-D Data grid of (generation, row, col)
+ * @param curGen The current generation
+ */
 __global__ void nextGen(bool* gens, int curGen)
 {
     const unsigned int row = threadIdx.y + blockIdx.y * blockDim.y;
@@ -49,12 +65,19 @@ __global__ void nextGen(bool* gens, int curGen)
                                          + gens[getActualIdx(curGen-1, row + 1, col + 1)] // North East
                                          ;
 
+        // Referenced from:
+        // http://www.marekfiser.com/Projects/Conways-Game-of-Life-on-GPU-using-CUDA/2-Basic-implementation
         gens[getActualIdx(curGen,row,col)] = neighborCount == 3
                                             || (neighborCount == 2 && gens[getActualIdx(curGen-1,row,col)]);
     }
 }
 
-bool* firstIterLife(const bool* initialGrid)
+/**
+ * Launches the CUDA compute kernels to generate the grids for GEN_COUNT generations
+ * @param initialGrid initial configuration
+ * @return linearized 3-D Data grid of (generation, row, col) - length: GEN_COUNT
+ */
+bool* cudaLife(const bool* initialGrid)
 {
     dim3 dimGrid(BLOCK_1D, BLOCK_1D);
     dim3 dimBlock(THREAD_1D, THREAD_1D);
@@ -81,17 +104,33 @@ bool* firstIterLife(const bool* initialGrid)
     return result;
 }
 
+/**
+ * @param row The row offset (By DIM per row)
+ * @param col The column offset (By 1 per col)
+ * @return the grid index not offset by generation of this row & column
+ */
 unsigned int getGridIdx(unsigned int row, unsigned int col)
 {
     return row * DIM + col;
 }
 
+/**
+ * @param gen The generation offset (by DIMxDIM per generation)
+ * @param row The row offset (By DIM per row)
+ * @param col The column offset (By 1 per col)
+ * @return the actual index of the linearized 3-D grid of (generation, row, col)
+ */
 unsigned int getActualIdxHost(unsigned int gen, unsigned int row, unsigned int col)
 {
     unsigned int genStart = gen * DIM * DIM; // Each subarray has DIM * DIM length
     return genStart + getGridIdx(row, col);
 }
 
+/**
+ * Compute the serial version of this algorithm
+ * @param initialGrid initial configuration
+ * @return linearized 3-D Data grid of (generation, row, col) - length: GEN_COUNT
+ */
 bool* serialLife(const bool* initialGrid)
 {
     bool* gens = new bool[GEN_COUNT*DIM*DIM];
@@ -126,6 +165,9 @@ bool* serialLife(const bool* initialGrid)
     return gens;
 }
 
+/**
+ * @return linearized 2-D Data grid of (row, col) of the configuration from DEFAULT_PATTERN_FILE
+ */
 bool* createGridFromFile()
 {
     std::vector<std::vector<bool>> dataGrid;
@@ -158,13 +200,20 @@ bool* createGridFromFile()
     return initialGrid;
 }
 
+/**
+ * @param gridIdx 2-D (non-linearized) index of row/col -> y/x
+ * @return the GUI coordinate in the range [-1, 1]
+ */
 float getCoord(int gridIdx)
 {
     return ((float)gridIdx * 2) / DIM - 1;
 }
 
-bool* g_lifeGrid; // because OpenGL is dumb
+bool* g_lifeGrid;
 
+/**
+ * Display the Game of Life animation on the GUI
+ */
 void display() 
 { 
     
@@ -183,6 +232,10 @@ void display()
     
 }
 
+/**
+ * Create a GUI panel to play the animation
+ * @param lifeGrid linearized 3-D Data grid of (generation, row, col) - length: GEN_COUNT
+ */
 void graphics(bool* lifeGrid)
 {
     glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
@@ -197,6 +250,12 @@ void graphics(bool* lifeGrid)
     glutMainLoop();
 }
 
+/**
+ * Print to the console the execution time of the argument's function
+ * @param func Function to measure the execution time
+ * @param initialGrid initial configuration
+ * @return linearized 3-D Data grid of (generation, row, col) - length: GEN_COUNT
+ */
 bool* measureTime(const std::function<bool* (const bool*)>& func,
     const bool* initialGrid)
 {
@@ -224,7 +283,7 @@ int main(int argc, char* argv[])
     std::cout << "Running " << GEN_COUNT << " generations on grid of " << DIM << "x" << DIM << std:: endl;
 
     std::cout << "CUDA version: " << std::endl;
-    bool* cudaResult = measureTime(firstIterLife, initialGrid);
+    bool* cudaResult = measureTime(cudaLife, initialGrid);
 
     std::cout << "Serial version: " << std:: endl;
     bool* serialResult = measureTime(serialLife, initialGrid);  
