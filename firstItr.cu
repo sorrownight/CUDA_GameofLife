@@ -3,6 +3,8 @@
 #include <functional>
 #include <string>
 #include <iostream>
+#include <fstream>
+#include <vector>
 
 const unsigned int THREAD_1D = 21;
 const unsigned int BLOCK_AREA = THREAD_1D * THREAD_1D;
@@ -11,6 +13,7 @@ const unsigned int DIM = (BLOCK_AREA * BLOCK_1D);
 // Reserving 4 rows/cols of 0s on the border to eliminate edge cases
 
 const unsigned int GEN_COUNT = 5000;
+const std::string DEFAULT_PATTERN_FILE = "data.txt";
 
 __device__ static unsigned int getRow()
 {
@@ -134,10 +137,42 @@ bool* measureTime(const std::function<bool*(const bool*)>& func,
     return result;
 }
 
+bool* createGridFromFile()
+{
+    std::vector<std::vector<bool>> dataGrid;
+
+    std::ifstream file(DEFAULT_PATTERN_FILE);
+    if (file.is_open()) {
+        std::string line;
+        while (std::getline(file, line)) {
+            std::vector<bool> curRow;
+            dataGrid.push_back(curRow);
+
+            for (char c : line) {
+                if (c == '.') curRow.push_back(false);
+                else curRow.push_back(true);
+            }
+        }
+
+    } else {
+        std::cout << "File cannot be opened!" << std::endl;
+        exit(-1);
+    }
+
+    bool* initialGrid = new bool[DIM*DIM];
+    for (unsigned int row = 1, dataRow = 0; row < DIM; row += dataGrid.size(), dataRow++) {
+        for (unsigned int col = 1 + dataRow * dataGrid[0].size(), dataCol = 0; col < DIM; col++, dataCol++) {
+            initialGrid[getGridIdx(row, col)] = dataGrid[dataRow][dataCol];
+        }
+    }
+
+    return initialGrid;
+}
+
 int main()
 {
 
-    bool* initialGrid = new bool[DIM*DIM];
+    bool* initialGrid = createGridFromFile();
     for (int row = 0; row < DIM; row++) initialGrid[getGridIdx(row, 0)] = false; // West edge
     for (int row = 0; row < DIM; row++) initialGrid[getGridIdx(row, DIM-1)] = false; // East edge
     for (int col = 0; col < DIM; col++) initialGrid[getGridIdx(0, col)] = false; // North edge
@@ -163,7 +198,7 @@ int main()
     }
 
     if (!matched) std::cout << "Not matched!" << std:: endl;
-    else std::cout << "Last generations of serial vs CUDA matched!" << std:: endl;
+    else std::cout << "Last generation of serial vs CUDA matched!" << std:: endl;
 
     delete[] initialGrid;
     delete[] serialResult;
