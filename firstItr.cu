@@ -160,9 +160,9 @@ bool* createGridFromFile()
     }
 
     bool* initialGrid = new bool[DIM*DIM];
-    for (unsigned int row = 1, dataRow = 0; row < DIM; row += dataGrid.size(), dataRow++) {
-        for (unsigned int col = 1 + dataRow * dataGrid[0].size(), dataCol = 0; col < DIM; col++, dataCol++) {
-            initialGrid[getGridIdx(row, col)] = dataGrid[dataRow][dataCol];
+    for (unsigned int row = 1; row < DIM; row++) {
+        for (unsigned int col = 1; col < DIM; col++) {
+            initialGrid[getGridIdx(row, col)] = dataGrid[(row-1) % dataGrid.size()][(col-1) % dataGrid[0].size()];
         }
     }
 
