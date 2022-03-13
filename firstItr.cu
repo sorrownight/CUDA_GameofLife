@@ -146,12 +146,12 @@ bool* createGridFromFile()
         std::string line;
         while (std::getline(file, line)) {
             std::vector<bool> curRow;
-            dataGrid.push_back(curRow);
 
             for (char c : line) {
                 if (c == '.') curRow.push_back(false);
                 else curRow.push_back(true);
             }
+            dataGrid.push_back(curRow);
         }
 
     } else {
