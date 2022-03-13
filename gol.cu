@@ -73,7 +73,7 @@ bool* firstIterLife(const bool* initialGrid)
     }
     bool *result = new bool[GEN_COUNT*DIM*DIM];
     cudaError_t code;
-    if ((code = cudaMemcpyAsync(result, d_gens, (GEN_COUNT * DIM * DIM) * sizeof(bool), cudaMemcpyDeviceToHost)) != cudaSuccess)
+    if ((code = cudaMemcpy(result, d_gens, (GEN_COUNT * DIM * DIM) * sizeof(bool), cudaMemcpyDeviceToHost)) != cudaSuccess)
         std::cout << "cudaMemcpy failed: Device->Host: " << cudaGetErrorString(code) << std::endl;
     
     cudaFree(d_gens);
@@ -195,8 +195,6 @@ void graphics(bool* lifeGrid)
     glutDisplayFunc(display);
 
     glutMainLoop();
-
-    getch();//pause here to see results or lack there of
 }
 
 bool* measureTime(const std::function<bool* (const bool*)>& func,
