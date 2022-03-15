@@ -22,8 +22,8 @@ const unsigned int BLOCK_1D = 80;
 const unsigned int DIM = (THREAD_1D * BLOCK_1D);
 // Reserving 4 rows/cols of 0s on the border to eliminate edge cases
 
-const unsigned int GEN_COUNT = 2000;
-const std::string DEFAULT_PATTERN_FILE = "data.txt";
+const unsigned int GEN_COUNT = 100;
+const std::string DEFAULT_PATTERN_FILE = "pattern.rle";
 
 
 /**
@@ -91,7 +91,6 @@ bool* cudaLife(const bool* initialGrid)
         std::cout << "cudaMemcpy failed: Host->Device" << std::endl;
 
     for (int gen = 1; gen < GEN_COUNT; gen++) {
-        //cudaDeviceSynchronize();
         nextGen<<<dimGrid, dimBlock>>>(d_gens, gen);
     }
     bool *result = new bool[GEN_COUNT*DIM*DIM];
@@ -175,14 +174,28 @@ bool* createGridFromFile()
     std::ifstream file(DEFAULT_PATTERN_FILE);
     if (file.is_open()) {
         std::string line;
+        int count = 1;
+        bool foundDig = false;
+        std::vector<bool> curRow;
         while (std::getline(file, line)) {
-            std::vector<bool> curRow;
-
             for (char c : line) {
-                if (c == '.') curRow.push_back(false);
-                else curRow.push_back(true);
+                if (c == '#' || c =='x' || c == 'y') break;
+                if (isdigit(c)) {
+                    if (foundDig) count = count * 10 + (c - '0'); // increase decimal place
+                    else count = c - '0';
+                    foundDig = true;
+                } else if (c == '$' || c == '!') {
+                    std::vector<bool> tmp (curRow);
+                    dataGrid.push_back(tmp);
+                    curRow.clear();
+                } else {
+                    while (count-- > 0)
+                        curRow.push_back(c == 'o');
+                    count = 1;
+                    foundDig = false;
+                }
             }
-            dataGrid.push_back(curRow);
+
         }
 
     } else {
@@ -193,7 +206,9 @@ bool* createGridFromFile()
     bool* initialGrid = new bool[DIM*DIM];
     for (unsigned int row = 1; row < DIM; row++) {
         for (unsigned int col = 1; col < DIM; col++) {
-            initialGrid[getGridIdx(row, col)] = dataGrid[(row-1) % dataGrid.size()][(col-1) % dataGrid[0].size()];
+            unsigned int vecIdx = (row-1) % dataGrid.size();
+            if (!dataGrid[vecIdx].empty())
+                initialGrid[getGridIdx(row, col)] = dataGrid[vecIdx][(col-1) % dataGrid[vecIdx].size()];
         }
     }
 

@@ -21,8 +21,9 @@
 
 
 ## Data format:
-* The program supports the official format for cell data from the Game of Life wiki
-* Data files should represent a MxN grid where each cell is represented with either "." (dead) or "O" (alive)
+* The program supports the official format for cell data from the Game of Life wiki (.rle)
+* Data files should represent a MxN grid where each cell is represented with either "b" (dead) or "o" (alive)
+* The count before any of these characters represents the number of times they repeat. The character “$” represents a new line, and “!” represents the end of file.
 * The program shall read in this file as its initial configuration for every MxN sub-grid until the entire board is filled with copies of this configuration
 
 
